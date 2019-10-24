@@ -43,7 +43,7 @@ public class Configure {
 	// [START retrieve_access_token]
 	private static String getAccessToken() throws IOException {
 		GoogleCredential googleCredential = GoogleCredential
-				.fromStream(new FileInputStream("D:\\Important_documents\\AndroidStudioProjects\\quickstart-java\\config\\src\\main\\java\\com\\google\\firebase\\samples\\config\\service-account.json"))
+				.fromStream(new FileInputStream("service-account.json"))
 				.createScoped(Arrays.asList(SCOPES));
 		googleCredential.refreshToken();
 		return googleCredential.getAccessToken();
