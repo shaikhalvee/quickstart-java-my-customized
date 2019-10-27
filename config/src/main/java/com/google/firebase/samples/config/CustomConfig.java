@@ -3,24 +3,17 @@ package com.google.firebase.samples.config;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
-import com.google.api.client.util.ByteStreams;
-import com.google.api.client.util.IOUtils;
 import com.google.api.services.firebaseremoteconfig.v1.model.RemoteConfig;
-import com.google.api.services.firebaseremoteconfig.v1.model.RemoteConfigParameter;
 import com.google.api.services.firebaseremoteconfig.v1.model.RemoteConfigParameterValue;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
-import com.google.gson.stream.JsonReader;
 
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Scanner;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -97,26 +90,10 @@ public class CustomConfig {
 		int code = httpURLConnection.getResponseCode();
 		if (code == 200) {
 			InputStream inputStream = new GZIPInputStream(httpURLConnection.getInputStream());
-			byte[] responseData = getBytesFromInputStream(inputStream);
-			ObjectMapper objectMapper = new ObjectMapper();
-			try {
-				ObjectInputStream objectInputStream = new ObjectInputStream(inputStream);
-				RemoteConfig remoteConfig = (RemoteConfig) objectInputStream.readObject();
-				handleRemoteConfig(remoteConfig);
-			} catch (ClassNotFoundException ex) {
-				System.err.println(ex.getCause().getMessage());
-			}
-			RemoteConfig remoteConfigTemp = objectMapper.convertValue(responseData, RemoteConfig.class);
-			Map<String, RemoteConfigParameter> parameters = remoteConfigTemp.getParameters();
-			System.out.println(parameters.get("my_value"));
-
-			JsonElement inputStreamJsonElement = JsonParser.parseReader(new InputStreamReader(inputStream));
+			JsonElement jsonElement = JsonParser.parseReader(new InputStreamReader(inputStream));
 
 			Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-			String jsonStr = gson.toJson(inputStreamJsonElement);
-			RemoteConfig remoteConfig = gson.fromJson(jsonStr, RemoteConfig.class);
-			System.out.println("remote config class: " + remoteConfig.getClass().getCanonicalName());
-//			handleRemoteConfig(remoteConfig);
+			String jsonStr = gson.toJson(jsonElement);
 
 			File file = new File("config.json");
 			PrintWriter printWriter = new PrintWriter(new FileWriter(file));
@@ -144,17 +121,14 @@ public class CustomConfig {
 	}
 
 	private static void handleRemoteConfig(RemoteConfig remoteConfig) {
-		Map<String, RemoteConfigParameter> parameterMap = new HashMap<>();
-		RemoteConfigParameterValue parameterValue = new RemoteConfigParameterValue();
+
+		Map<String, Map<String, RemoteConfigParameterValue>> parameterMap = new HashMap<>();
 		ObjectMapper objectMapper = new ObjectMapper();
-//		parameterValue = objectMapper.convertValue(remoteConfig.getParameters())
-		parameterValue = objectMapper.convertValue(parameterMap.get("my_value").getClass(), new TypeReference<RemoteConfigParameterValue>() {});
-		parameterMap = objectMapper.convertValue(remoteConfig.getParameters(), new TypeReference<Map<String, RemoteConfigParameter>>() {});
-		System.out.println("parameterMap: " + parameterMap.toString());
-		System.out.println("parameter Class:" + parameterMap.getClass().getName());
-		RemoteConfigParameter remoteConfigParameter = parameterMap.get("my_value");
-		String value = remoteConfigParameter.getDefaultValue().getValue();
-		System.out.println("value: " + value);
+		parameterMap = objectMapper.convertValue(remoteConfig.getParameters(), new TypeReference<Map<String, Map<String, RemoteConfigParameterValue>>>() {});
+		parameterMap.get("max_value").get("defaultValue").setValue("50");
+
+		System.out.println("remote config: " + remoteConfig.toString());
+		System.out.println("parameter map: " + parameterMap.toString());
 	}
 
 	/**
@@ -191,6 +165,7 @@ public class CustomConfig {
 		httpURLConnection.setRequestProperty("Content-Encoding", "gzip");
 
 		String configStr = readConfig();
+		System.out.println(configStr);
 
 		GZIPOutputStream gzipOutputStream = new GZIPOutputStream(httpURLConnection.getOutputStream());
 		OutputStreamWriter outputStreamWriter = new OutputStreamWriter(gzipOutputStream);
@@ -204,7 +179,60 @@ public class CustomConfig {
 		} else {
 			System.out.println(inputStreamToString(httpURLConnection.getErrorStream()));
 		}
+	}
 
+	private static void publishTemplate2(String key, String value) throws IOException {
+		List<String> outputCredentials = formatETagAndOutputString(key, value);
+
+		System.out.println("Publishing template...");
+		HttpURLConnection httpURLConnection = getCommonConnection(BASE_URL + REMOTE_CONFIG_ENDPOINT);
+		httpURLConnection.setDoOutput(true);
+		httpURLConnection.setRequestMethod("PUT");
+		httpURLConnection.setRequestProperty("If-Match", outputCredentials.get(0));
+		httpURLConnection.setRequestProperty("Content-Encoding", "gzip");
+
+		GZIPOutputStream gzipOutputStream = new GZIPOutputStream(httpURLConnection.getOutputStream());
+		OutputStreamWriter outputStreamWriter = new OutputStreamWriter(gzipOutputStream);
+		outputStreamWriter.write(outputCredentials.get(1));
+		outputStreamWriter.flush();
+		outputStreamWriter.close();
+
+		int code = httpURLConnection.getResponseCode();
+		if (code == 200) {
+			System.out.println("Template has been published.");
+		} else {
+			System.out.println(inputStreamToString(httpURLConnection.getErrorStream()));
+		}
+	}
+
+	private static List<String> formatETagAndOutputString(String key, String value) throws IOException {
+		List<String> output = new ArrayList<>();
+
+		HttpURLConnection httpURLConnection = getCommonConnection(BASE_URL + REMOTE_CONFIG_ENDPOINT);
+		httpURLConnection.setRequestMethod("GET");
+		httpURLConnection.setRequestProperty("Accept-Encoding", "gzip");
+		int code = httpURLConnection.getResponseCode();
+		if (code == 200) {
+			output.add(httpURLConnection.getHeaderField("ETag"));
+
+			InputStream inputStream = new GZIPInputStream(httpURLConnection.getInputStream());
+			JsonElement jsonElement = JsonParser.parseReader(new InputStreamReader(inputStream));
+
+			Gson gson = new GsonBuilder().create();
+			RemoteConfig remoteConfig = gson.fromJson(jsonElement, RemoteConfig.class);
+
+			Map<String, Map<String, RemoteConfigParameterValue>> remoteConfigParameterValue = new HashMap<>();
+			ObjectMapper objectMapper = new ObjectMapper();
+			remoteConfigParameterValue = objectMapper.convertValue(remoteConfig.getParameters(), new TypeReference<Map<String, Map<String, RemoteConfigParameterValue>>>() {});
+			remoteConfigParameterValue.get(key).get("defaultValue").setValue(value);
+
+			String val = gson.toJson(remoteConfigParameterValue);
+
+			output.add("{\"parameters\":" + val + "}");
+		} else {
+			System.err.println(inputStreamToString(httpURLConnection.getErrorStream()));
+		}
+		return output;
 	}
 
 	/**
@@ -229,12 +257,18 @@ public class CustomConfig {
 		Scanner input = new Scanner(System.in);
 		while (input.hasNext()) {
 			String val = input.nextLine();
-			if (val.equals("publish")) {
-				publishTemplate();
-			} else if (val.equals("get")) {
-				getTemplate();
-			} else {
-				System.exit(0);
+			switch (val) {
+				case "publish":
+					publishTemplate();
+					break;
+				case "publish2":
+					publishTemplate2("min_value", "1");
+					break;
+				case "get":
+					getTemplate();
+					break;
+				default:
+					System.exit(0);
 			}
 		}
 	}
