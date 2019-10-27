@@ -3,6 +3,8 @@ package com.google.firebase.samples.config;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.util.ByteStreams;
+import com.google.api.client.util.IOUtils;
 import com.google.api.services.firebaseremoteconfig.v1.model.RemoteConfig;
 import com.google.api.services.firebaseremoteconfig.v1.model.RemoteConfigParameter;
 import com.google.api.services.firebaseremoteconfig.v1.model.RemoteConfigParameterValue;
@@ -95,24 +97,26 @@ public class CustomConfig {
 		int code = httpURLConnection.getResponseCode();
 		if (code == 200) {
 			InputStream inputStream = new GZIPInputStream(httpURLConnection.getInputStream());
-//			try {
-//				ObjectInputStream objectInputStream = new ObjectInputStream(inputStream);
-//				RemoteConfig remoteConfig = (RemoteConfig) objectInputStream.readObject();
-//				handleRemoteConfig(remoteConfig);
-//			} catch (ClassNotFoundException ex) {
-//				System.err.println(ex.getCause().getMessage());
-//			}
+			byte[] responseData = getBytesFromInputStream(inputStream);
+			ObjectMapper objectMapper = new ObjectMapper();
+			try {
+				ObjectInputStream objectInputStream = new ObjectInputStream(inputStream);
+				RemoteConfig remoteConfig = (RemoteConfig) objectInputStream.readObject();
+				handleRemoteConfig(remoteConfig);
+			} catch (ClassNotFoundException ex) {
+				System.err.println(ex.getCause().getMessage());
+			}
+			RemoteConfig remoteConfigTemp = objectMapper.convertValue(responseData, RemoteConfig.class);
+			Map<String, RemoteConfigParameter> parameters = remoteConfigTemp.getParameters();
+			System.out.println(parameters.get("my_value"));
 
-//			String response = inputStreamToString(inputStream);
 			JsonElement inputStreamJsonElement = JsonParser.parseReader(new InputStreamReader(inputStream));
-//			JsonElement jsonElement = JsonParser.parseString(response);
 
 			Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-//			String jsonStr = gson.toJson(jsonElement);
 			String jsonStr = gson.toJson(inputStreamJsonElement);
 			RemoteConfig remoteConfig = gson.fromJson(jsonStr, RemoteConfig.class);
 			System.out.println("remote config class: " + remoteConfig.getClass().getCanonicalName());
-			handleRemoteConfig(remoteConfig);
+//			handleRemoteConfig(remoteConfig);
 
 			File file = new File("config.json");
 			PrintWriter printWriter = new PrintWriter(new FileWriter(file));
@@ -130,11 +134,21 @@ public class CustomConfig {
 		}
 	}
 
+	public static byte[] getBytesFromInputStream(InputStream is) throws IOException {
+		ByteArrayOutputStream os = new ByteArrayOutputStream();
+		byte[] buffer = new byte[0xFFFF];
+		for (int len = is.read(buffer); len != -1; len = is.read(buffer)) {
+			os.write(buffer, 0, len);
+		}
+		return os.toByteArray();
+	}
+
 	private static void handleRemoteConfig(RemoteConfig remoteConfig) {
 		Map<String, RemoteConfigParameter> parameterMap = new HashMap<>();
 		RemoteConfigParameterValue parameterValue = new RemoteConfigParameterValue();
 		ObjectMapper objectMapper = new ObjectMapper();
 //		parameterValue = objectMapper.convertValue(remoteConfig.getParameters())
+		parameterValue = objectMapper.convertValue(parameterMap.get("my_value").getClass(), new TypeReference<RemoteConfigParameterValue>() {});
 		parameterMap = objectMapper.convertValue(remoteConfig.getParameters(), new TypeReference<Map<String, RemoteConfigParameter>>() {});
 		System.out.println("parameterMap: " + parameterMap.toString());
 		System.out.println("parameter Class:" + parameterMap.getClass().getName());
