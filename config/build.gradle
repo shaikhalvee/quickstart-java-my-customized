@@ -26,5 +26,6 @@ dependencies {
 //    compile 'com.google.api-client:google-api-client:1.23.0'
 //	implementation 'com.google.firebase:firebase-admin:6.10.0'
 	compile group: 'com.google.apis', name: 'google-api-services-firebaseremoteconfig', version: 'v1-rev14-1.23.0'
-    compile 'com.google.code.gson:gson:2.8.6'
+	compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.0.1'
+	compile 'com.google.code.gson:gson:2.8.6'
 }

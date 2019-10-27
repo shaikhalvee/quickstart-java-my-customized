@@ -1,15 +1,23 @@
 package com.google.firebase.samples.config;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.services.firebaseremoteconfig.v1.model.RemoteConfig;
+import com.google.api.services.firebaseremoteconfig.v1.model.RemoteConfigParameter;
+import com.google.api.services.firebaseremoteconfig.v1.model.RemoteConfigParameterValue;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
 
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -66,8 +74,10 @@ public class CustomConfig {
 	private static HttpURLConnection getCommonConnection(String endpoint) throws IOException {
 		URL url = new URL(endpoint);
 		HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-		httpURLConnection.setRequestProperty("Authorization", "Bearer " + getAccessToken());
+		String token = getAccessToken();
+		httpURLConnection.setRequestProperty("Authorization", "Bearer " + token);
 		httpURLConnection.setRequestProperty("Content-Type", "application/json; UTF-8");
+		System.out.println(token);
 		return httpURLConnection;
 	}
 
@@ -85,11 +95,24 @@ public class CustomConfig {
 		int code = httpURLConnection.getResponseCode();
 		if (code == 200) {
 			InputStream inputStream = new GZIPInputStream(httpURLConnection.getInputStream());
-			String response = inputStreamToString(inputStream);
-			JsonElement jsonElement = JsonParser.parseString(response);
+//			try {
+//				ObjectInputStream objectInputStream = new ObjectInputStream(inputStream);
+//				RemoteConfig remoteConfig = (RemoteConfig) objectInputStream.readObject();
+//				handleRemoteConfig(remoteConfig);
+//			} catch (ClassNotFoundException ex) {
+//				System.err.println(ex.getCause().getMessage());
+//			}
+
+//			String response = inputStreamToString(inputStream);
+			JsonElement inputStreamJsonElement = JsonParser.parseReader(new InputStreamReader(inputStream));
+//			JsonElement jsonElement = JsonParser.parseString(response);
 
 			Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-			String jsonStr = gson.toJson(jsonElement);
+//			String jsonStr = gson.toJson(jsonElement);
+			String jsonStr = gson.toJson(inputStreamJsonElement);
+			RemoteConfig remoteConfig = gson.fromJson(jsonStr, RemoteConfig.class);
+			System.out.println("remote config class: " + remoteConfig.getClass().getCanonicalName());
+			handleRemoteConfig(remoteConfig);
 
 			File file = new File("config.json");
 			PrintWriter printWriter = new PrintWriter(new FileWriter(file));
@@ -105,6 +128,19 @@ public class CustomConfig {
 		} else {
 			System.out.println(inputStreamToString(httpURLConnection.getErrorStream()));
 		}
+	}
+
+	private static void handleRemoteConfig(RemoteConfig remoteConfig) {
+		Map<String, RemoteConfigParameter> parameterMap = new HashMap<>();
+		RemoteConfigParameterValue parameterValue = new RemoteConfigParameterValue();
+		ObjectMapper objectMapper = new ObjectMapper();
+//		parameterValue = objectMapper.convertValue(remoteConfig.getParameters())
+		parameterMap = objectMapper.convertValue(remoteConfig.getParameters(), new TypeReference<Map<String, RemoteConfigParameter>>() {});
+		System.out.println("parameterMap: " + parameterMap.toString());
+		System.out.println("parameter Class:" + parameterMap.getClass().getName());
+		RemoteConfigParameter remoteConfigParameter = parameterMap.get("my_value");
+		String value = remoteConfigParameter.getDefaultValue().getValue();
+		System.out.println("value: " + value);
 	}
 
 	/**
@@ -175,6 +211,7 @@ public class CustomConfig {
 	}
 
 	public static void main(String[] args) throws IOException {
+		RemoteConfig remoteConfig = new RemoteConfig();
 		Scanner input = new Scanner(System.in);
 		while (input.hasNext()) {
 			String val = input.nextLine();
