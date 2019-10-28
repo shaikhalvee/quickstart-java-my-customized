@@ -262,7 +262,9 @@ public class CustomConfig {
 					publishTemplate();
 					break;
 				case "publish2":
-					publishTemplate2("min_value", "1");
+					String key = input.nextLine();
+					String value = input.nextLine();
+					publishTemplate2(key, value);
 					break;
 				case "get":
 					getTemplate();
