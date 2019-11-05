@@ -44,6 +44,20 @@ public class CustomConfig {
 	}
 	// [END retrieve_access_token]
 
+	private static void getInformations() throws IOException {
+		GoogleCredential googleCredential = GoogleCredential
+				.fromStream(new FileInputStream("service-account.json"))
+				.createScoped(Arrays.asList(SCOPES));
+		System.out.println("service account id: " + googleCredential.getServiceAccountId());
+		System.out.println("private account user: " + googleCredential.getServiceAccountUser());
+		System.out.println("private key string: " + googleCredential.getServiceAccountPrivateKey().toString());
+		System.out.println("private key algorithm: " + googleCredential.getServiceAccountPrivateKey().getAlgorithm());
+		System.out.println("private key format: " + googleCredential.getServiceAccountPrivateKey().getFormat());
+		System.out.println("private key id: " + googleCredential.getServiceAccountPrivateKeyId());
+		System.out.println("private project id: " + googleCredential.getServiceAccountProjectId());
+		System.out.println("private scopes: " + googleCredential.getServiceAccountScopesAsString());
+	}
+
 	/**
 	 * Read contents of InputStream into String.
 	 *
@@ -253,7 +267,6 @@ public class CustomConfig {
 	}
 
 	public static void main(String[] args) throws IOException {
-		RemoteConfig remoteConfig = new RemoteConfig();
 		Scanner input = new Scanner(System.in);
 		while (input.hasNext()) {
 			String val = input.nextLine();
@@ -268,6 +281,9 @@ public class CustomConfig {
 					break;
 				case "get":
 					getTemplate();
+					break;
+				case "info":
+					getInformations();
 					break;
 				default:
 					System.exit(0);
