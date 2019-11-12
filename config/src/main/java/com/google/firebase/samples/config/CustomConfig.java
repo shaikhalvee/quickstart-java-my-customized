@@ -120,12 +120,16 @@ public class CustomConfig {
 					.create();
 			String jsonStr = gson.toJson(jsonElement);
 
-			RemoteConfig remoteConfig = gson.fromJson(jsonStr, RemoteConfig.class);
+			ResponseConfig remoteConfig = gson.fromJson(jsonStr, ResponseConfig.class);
+			Map<String, ResponseConfigParameter> responseConfigParameterMap = remoteConfig.getParameters();
+			ResponseConfigParameterValue responseConfigParameterValue = responseConfigParameterMap.get("my_value").getDefaultValue();
+			System.out.println(responseConfigParameterValue.getValue());
 
-			String remoteConfigParamStr = gson.toJson(remoteConfig.getParameters());
-			Type remoteConfigParamValMapType = new TypeToken<Map<String, Map<String, RemoteConfigParameterValue>>>() {}.getType();
-			Map<String, Map<String, RemoteConfigParameterValue>> returnedVal = gson.fromJson(remoteConfigParamStr, remoteConfigParamValMapType);
-			System.out.println(returnedVal.toString());
+//			String remoteConfigParamStr = gson.toJson(remoteConfig.getParameters());
+//			Type remoteConfigParamValMapType = new TypeToken<Map<String, Map<String, ResponseConfigParameterValue>>>() {}.getType();
+//			Map<String, Map<String, ResponseConfigParameterValue>> returnedVal = gson.fromJson(remoteConfigParamStr, remoteConfigParamValMapType);
+//			System.out.println(returnedVal.toString());
+
 			/*File file = new File("config.json");
 			PrintWriter printWriter = new PrintWriter(new FileWriter(file));
 			printWriter.print(jsonStr);
