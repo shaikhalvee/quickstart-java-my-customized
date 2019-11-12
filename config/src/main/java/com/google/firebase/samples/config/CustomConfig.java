@@ -4,13 +4,19 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.services.firebaseremoteconfig.v1.model.RemoteConfig;
+import com.google.api.services.firebaseremoteconfig.v1.model.RemoteConfigParameter;
 import com.google.api.services.firebaseremoteconfig.v1.model.RemoteConfigParameterValue;
+import com.google.firebase.samples.config.firebaseMirror.model.ResponseConfig;
+import com.google.firebase.samples.config.firebaseMirror.model.ResponseConfigParameter;
+import com.google.firebase.samples.config.firebaseMirror.model.ResponseConfigParameterValue;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import com.google.gson.reflect.TypeToken;
 
 import java.io.*;
+import java.lang.reflect.Type;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.*;
@@ -106,10 +112,21 @@ public class CustomConfig {
 			InputStream inputStream = new GZIPInputStream(httpURLConnection.getInputStream());
 			JsonElement jsonElement = JsonParser.parseReader(new InputStreamReader(inputStream));
 
-			Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+			Gson gson = new GsonBuilder()
+					.setPrettyPrinting()
+					.disableHtmlEscaping()
+					.enableComplexMapKeySerialization()
+					.serializeSpecialFloatingPointValues()
+					.create();
 			String jsonStr = gson.toJson(jsonElement);
 
-			File file = new File("config.json");
+			RemoteConfig remoteConfig = gson.fromJson(jsonStr, RemoteConfig.class);
+
+			String remoteConfigParamStr = gson.toJson(remoteConfig.getParameters());
+			Type remoteConfigParamValMapType = new TypeToken<Map<String, Map<String, RemoteConfigParameterValue>>>() {}.getType();
+			Map<String, Map<String, RemoteConfigParameterValue>> returnedVal = gson.fromJson(remoteConfigParamStr, remoteConfigParamValMapType);
+			System.out.println(returnedVal.toString());
+			/*File file = new File("config.json");
 			PrintWriter printWriter = new PrintWriter(new FileWriter(file));
 			printWriter.print(jsonStr);
 			printWriter.flush();
@@ -119,7 +136,7 @@ public class CustomConfig {
 
 			// Print ETag
 			String etag = httpURLConnection.getHeaderField("ETag");
-			System.out.println("ETag from server: " + etag);
+			System.out.println("ETag from server: " + etag);*/
 		} else {
 			System.out.println(inputStreamToString(httpURLConnection.getErrorStream()));
 		}
@@ -240,9 +257,11 @@ public class CustomConfig {
 			remoteConfigParameterValue = objectMapper.convertValue(remoteConfig.getParameters(), new TypeReference<Map<String, Map<String, RemoteConfigParameterValue>>>() {});
 			remoteConfigParameterValue.get(key).get("defaultValue").setValue(value);
 
-			String val = gson.toJson(remoteConfigParameterValue);
-
-			output.add("{\"parameters\":" + val + "}");
+			String params = "parameters";
+			Map<String, Map<String, Map<String, RemoteConfigParameterValue>>> parameters = new HashMap<>();
+			parameters.put(params, remoteConfigParameterValue);
+			String val = gson.toJson(parameters);
+			output.add(val);
 		} else {
 			System.err.println(inputStreamToString(httpURLConnection.getErrorStream()));
 		}
